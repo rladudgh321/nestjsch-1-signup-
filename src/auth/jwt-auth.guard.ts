@@ -5,10 +5,17 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { IS_PUBLIC_KEY } from 'src/common/decorators/public.decrorator';
+import { ROLES_KEY } from 'src/common/decorators/role.decorator';
+import { Role } from 'src/user/enum/user.enum';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private reflector: Reflector, private readonly jwtService: JwtService) {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly jwtService: JwtService,
+    private readonly userService: UserService,
+  ) {
     super();
   }
 
@@ -31,6 +38,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       console.error('accessToken is required');
       throw new UnauthorizedException();
     }
+
+    const requireRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (requireRoles) {
+      const userId = decoded['sub'];
+      return this.userService.checkUserIsAdmin(userId);
+    }
+
     return super.canActivate(context);
   }
 }
